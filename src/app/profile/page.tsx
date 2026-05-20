@@ -603,7 +603,7 @@ export default function ProfilePage() {
                       <label className="label-base">Address Title</label>
                       <input
                         type="text"
-                        placeholder="e.g., Home, Work, Qatar Address"
+                        placeholder="e.g., Home, Work, Address"
                         required
                         className="w-full input-base"
                         value={newAddress.title || ''}
