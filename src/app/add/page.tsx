@@ -171,7 +171,7 @@ export default function AddLetterPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const currentStatus = sentDate ? 'Active' : 'Draft';
+    const currentStatus = 'Active';
 
     // Create the first letter
     const { error: firstError } = await supabase.from('letters').insert({
@@ -234,8 +234,8 @@ export default function AddLetterPage() {
       // We don't necessarily want to block the whole flow if the draft fails, 
       // but maybe alert the user or just proceed.
     }
-
-    router.push('/');
+    
+    router.push('/dashboard');
   };
 
   return (

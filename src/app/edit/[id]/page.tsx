@@ -33,7 +33,7 @@ export default function EditLetterPage() {
 
       if (error) {
         console.error('Error fetching letter:', error.message || error);
-        router.push('/');
+        router.push('/dashboard');
       } else {
         setLetter(data);
       }
@@ -90,7 +90,7 @@ export default function EditLetterPage() {
       alert(error.message);
       setSaving(false);
     } else {
-      router.push('/');
+      router.push('/dashboard');
     }
   };
 
@@ -133,7 +133,7 @@ export default function EditLetterPage() {
     if (error) {
       alert(error.message);
     } else {
-      router.push('/');
+      router.push('/dashboard');
     }
   };
 
@@ -528,7 +528,7 @@ export default function EditLetterPage() {
                         onChange={(e) => setLetter({ 
                           ...letter, 
                           is_completed: e.target.checked,
-                          status: e.target.checked ? 'Delivered' : (letter.status === 'Delivered' ? 'Active' : letter.status)
+                          status: e.target.checked ? 'Delivered' : (letter.status === 'Delivered' ? 'Active' : (letter.status || 'Active'))
                         })}
                       />
                     </div>

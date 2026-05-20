@@ -7,7 +7,7 @@ import { STATUSES, LetterStatus } from '@/constants/statuses';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Mail, ArrowRight, Calendar, MapPin, Search, LayoutGrid, List as ListIcon, Table as TableIcon, ChevronLeft, ChevronRight, ArrowUpDown, ChevronUp, ChevronDown, Globe, Paperclip, Link as LinkIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -63,7 +63,11 @@ export default function DashboardPage() {
       (letter.from_zip_code || '').toLowerCase().includes(searchLower) ||
       ((letter as any).sources?.name || '').toLowerCase().includes(searchLower);
     
-    const matchesStatus = statusFilter === 'All' || letter.status === statusFilter;
+    const matchesStatus = statusFilter === 'All' || 
+                         (statusFilter === 'Sending' && letter.direction === 'sending' && letter.status === 'Active') ||
+                         (statusFilter === 'Receiving' && letter.direction === 'receiving' && letter.status === 'Active') ||
+                         letter.status === statusFilter;
+    
     if (statusFilter === 'Delivered') {
       return matchesSearch && letter.is_completed;
     }
@@ -79,6 +83,9 @@ export default function DashboardPage() {
     if (sortConfig.key === 'where') {
       aValue = a.from_country;
       bValue = b.from_country;
+    } else if (sortConfig.key === 'days' as any) {
+      aValue = calculateDays(a);
+      bValue = calculateDays(b);
     } else {
       aValue = a[sortConfig.key];
       bValue = b[sortConfig.key];
@@ -120,6 +127,51 @@ export default function DashboardPage() {
       : <ChevronDown size={14} className="ml-1 text-brand-600" />;
   };
 
+  const getStatusCount = (status: LetterStatus | 'All') => {
+    return letters.filter(letter => {
+      const matchesStatus = status === 'All' || 
+                           (status === 'Sending' && letter.direction === 'sending' && letter.status === 'Active') ||
+                           (status === 'Receiving' && letter.direction === 'receiving' && letter.status === 'Active') ||
+                           letter.status === status;
+      
+      if (status === 'Delivered') {
+        return letter.is_completed;
+      }
+      return matchesStatus;
+    }).length;
+  };
+
+  const getStatusColor = (status: LetterStatus | 'All') => {
+    switch (status) {
+      case 'All': return 'bg-brand-600 text-white shadow-brand-200';
+      case 'Sending': return 'bg-blue-600 text-white shadow-blue-200';
+      case 'Receiving': return 'bg-indigo-600 text-white shadow-indigo-200';
+      case 'Delivered': return 'bg-green-600 text-white shadow-green-200';
+      case 'Draft': return 'bg-slate-600 text-white shadow-slate-200';
+      case 'Returned': return 'bg-purple-600 text-white shadow-purple-200';
+      case 'Lost': return 'bg-red-600 text-white shadow-red-200';
+      default: return 'bg-brand-600 text-white shadow-brand-200';
+    }
+  };
+
+  const calculateDays = (letter: Letter) => {
+    if (!letter.sent_date) return null;
+    
+    const startDate = new Date(letter.sent_date);
+    const endDate = letter.is_completed && letter.received_date 
+      ? new Date(letter.received_date) 
+      : new Date();
+    
+    return differenceInDays(endDate, startDate);
+  };
+
+  const getDaysColor = (days: number | null) => {
+    if (days === null) return 'text-slate-400';
+    if (days <= 7) return 'text-green-600 font-bold';
+    if (days > 45) return 'text-red-600 font-bold';
+    return 'text-slate-600';
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -137,13 +189,6 @@ export default function DashboardPage() {
           <p className="text-slate-500 mt-1">Manage and track your correspondence</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link 
-            href="/" 
-            className="btn-secondary hidden lg:flex items-center justify-center gap-2"
-          >
-            <Globe size={20} />
-            <span>Global Stats</span>
-          </Link>
           <div className="bg-slate-100 p-1 rounded-lg flex items-center">
             <button
               onClick={() => setViewMode('grid')}
@@ -194,25 +239,35 @@ export default function DashboardPage() {
       <div className="flex flex-wrap gap-2 overflow-x-auto pb-1 scrollbar-hide">
         <button
           onClick={() => setStatusFilter('All')}
-          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
             statusFilter === 'All'
-              ? 'bg-brand-600 text-white shadow-sm shadow-brand-200'
+              ? `${getStatusColor('All')} shadow-sm`
               : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-300 hover:text-brand-600'
           }`}
         >
-          All
+          <span>All</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+            statusFilter === 'All' ? 'bg-white/20' : 'bg-slate-100 text-slate-500'
+          }`}>
+            {getStatusCount('All')}
+          </span>
         </button>
         {STATUSES.map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
               statusFilter === status
-                ? 'bg-brand-600 text-white shadow-sm shadow-brand-200'
+                ? `${getStatusColor(status)} shadow-sm`
                 : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-300 hover:text-brand-600'
             }`}
           >
-            {status}
+            <span>{status}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+              statusFilter === status ? 'bg-white/20' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {getStatusCount(status)}
+            </span>
           </button>
         ))}
       </div>
@@ -235,7 +290,7 @@ export default function DashboardPage() {
           <p className="text-slate-500 mt-1 max-w-xs mx-auto">
             {searchTerm ? "We couldn't find any letters matching your search." : "You haven't added any letters yet. Start by adding your first one!"}
           </p>
-          {!searchTerm && (
+          {!searchTerm && statusFilter !== 'Returned' && statusFilter !== 'Lost' && (
             <Link href="/add" className="btn-secondary mt-6 inline-flex items-center gap-2">
               <Plus size={18} /> Add First Letter
             </Link>
@@ -244,10 +299,10 @@ export default function DashboardPage() {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {paginatedLetters.map((letter) => (
-            <Link 
+            <div 
               key={letter.id} 
-              href={`/edit/${letter.id}`} 
-              className="card group hover:border-brand-300 hover:shadow-md transition-all duration-300 flex flex-col"
+              onClick={() => router.push(`/edit/${letter.id}`)}
+              className="card group hover:border-brand-300 hover:shadow-md transition-all duration-300 flex flex-col cursor-pointer"
             >
               <div className="p-5 flex-grow">
                 <div className="flex justify-between items-start mb-4">
@@ -259,7 +314,9 @@ export default function DashboardPage() {
                       ? 'bg-green-100 text-green-700 border border-green-200' 
                       : 'bg-amber-100 text-amber-700 border border-amber-200'
                   }`}>
-                    {letter.status}
+                    {letter.status === 'Active' 
+                      ? (letter.direction === 'sending' ? 'Sending' : 'Receiving') 
+                      : letter.status}
                   </span>
                 </div>
                 
@@ -311,16 +368,16 @@ export default function DashboardPage() {
                 <span>View Details</span>
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       ) : viewMode === 'list' ? (
         <div className="space-y-3">
           {paginatedLetters.map((letter) => (
-            <Link 
+            <div 
               key={letter.id} 
-              href={`/edit/${letter.id}`} 
-              className="card group hover:border-brand-300 hover:shadow-sm transition-all duration-300 flex items-center p-4 gap-4"
+              onClick={() => router.push(`/edit/${letter.id}`)}
+              className="card group hover:border-brand-300 hover:shadow-sm transition-all duration-300 flex items-center p-4 gap-4 cursor-pointer"
             >
               <div className="bg-brand-50 text-brand-700 p-2.5 rounded-xl group-hover:bg-brand-600 group-hover:text-white transition-colors duration-300 shrink-0">
                 <Mail size={22} />
@@ -336,7 +393,9 @@ export default function DashboardPage() {
                       ? 'bg-green-50 text-green-700 border border-green-100' 
                       : 'bg-amber-50 text-amber-700 border border-amber-100'
                   }`}>
-                    {letter.status}
+                    {letter.status === 'Active' 
+                      ? (letter.direction === 'sending' ? 'Sending' : 'Receiving') 
+                      : letter.status}
                   </span>
                 </div>
                 
@@ -377,7 +436,7 @@ export default function DashboardPage() {
               <div className="shrink-0 text-slate-300 group-hover:text-brand-600 transition-colors">
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       ) : (
@@ -422,15 +481,6 @@ export default function DashboardPage() {
                   <div className="flex items-center">Tracking {getSortIcon('tracking' as any)}</div>
                 </th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">
-                  City
-                </th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">
-                  Zip
-                </th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">
-                  Address
-                </th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">
                   Source
                 </th>
                 <th 
@@ -438,6 +488,12 @@ export default function DashboardPage() {
                   onClick={() => handleSort('status')}
                 >
                   <div className="flex items-center">Status {getSortIcon('status')}</div>
+                </th>
+                <th 
+                  className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left cursor-pointer hover:bg-slate-100 transition-colors"
+                  onClick={() => handleSort('days' as any)}
+                >
+                  <div className="flex items-center">Days {getSortIcon('days' as any)}</div>
                 </th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">
                   File
@@ -483,15 +539,6 @@ export default function DashboardPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 text-left">
-                    {letter.direction === 'sending' ? (letter.to_city || '-') : (letter.from_city || '-')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 text-left">
-                    {letter.direction === 'sending' ? (letter.to_zip_code || '-') : (letter.from_zip_code || '-')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 text-left max-w-xs truncate">
-                    {letter.direction === 'sending' ? (letter.to_address_line1 || '-') : (letter.from_address_line1 || '-')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 text-left">
                     {(letter as any).sources?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-left">
@@ -500,8 +547,20 @@ export default function DashboardPage() {
                         ? 'bg-green-100 text-green-700' 
                         : 'bg-amber-100 text-amber-700'
                     }`}>
-                      {letter.status}
+                      {letter.status === 'Active' 
+                        ? (letter.direction === 'sending' ? 'Sending' : 'Receiving') 
+                        : letter.status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
+                    {(() => {
+                      const days = calculateDays(letter);
+                      return (
+                        <span className={getDaysColor(days)}>
+                          {days !== null ? `${days} days` : '-'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-slate-400">
                     {letter.attachment_url ? (

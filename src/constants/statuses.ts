@@ -1,5 +1,6 @@
 export const STATUSES = [
-  'Active',
+  'Sending',
+  'Receiving',
   'Delivered',
   'Draft',
   'Returned',
