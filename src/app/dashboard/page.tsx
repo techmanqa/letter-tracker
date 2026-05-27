@@ -49,6 +49,56 @@ export default function DashboardPage() {
     checkUserAndFetchLetters();
   }, [router]);
 
+  // Reset to first page when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  const calculateDays = (letter: Letter) => {
+    if (!letter.sent_date) return null;
+    
+    const startDate = new Date(letter.sent_date);
+    const endDate = letter.is_completed && letter.received_date 
+      ? new Date(letter.received_date) 
+      : new Date();
+    
+    return differenceInDays(endDate, startDate);
+  };
+
+  const getStatusCount = (status: LetterStatus | 'All') => {
+    return letters.filter(letter => {
+      const matchesStatus = status === 'All' || 
+                           (status === 'Sending' && letter.direction === 'sending' && letter.status === 'Active') ||
+                           (status === 'Receiving' && letter.direction === 'receiving' && letter.status === 'Active') ||
+                           letter.status === status;
+      
+      if (status === 'Delivered') {
+        return letter.is_completed;
+      }
+      return matchesStatus;
+    }).length;
+  };
+
+  const getStatusColor = (status: LetterStatus | 'All') => {
+    switch (status) {
+      case 'All': return 'bg-brand-600 text-white shadow-brand-200';
+      case 'Sending': return 'bg-blue-600 text-white shadow-blue-200';
+      case 'Receiving': return 'bg-indigo-600 text-white shadow-indigo-200';
+      case 'Delivered': return 'bg-green-600 text-white shadow-green-200';
+      case 'Draft': return 'bg-slate-600 text-white shadow-slate-200';
+      case 'Returned': return 'bg-purple-600 text-white shadow-purple-200';
+      case 'Lost': return 'bg-red-600 text-white shadow-red-200';
+      default: return 'bg-brand-600 text-white shadow-brand-200';
+    }
+  };
+
+  const getDaysColor = (days: number | null) => {
+    if (days === null) return 'text-slate-400';
+    if (days <= 7) return 'text-green-600 font-bold';
+    if (days > 45) return 'text-red-600 font-bold';
+    return 'text-slate-600';
+  };
+
   const filteredLetters = letters.filter(letter => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
@@ -127,50 +177,6 @@ export default function DashboardPage() {
       : <ChevronDown size={14} className="ml-1 text-brand-600" />;
   };
 
-  const getStatusCount = (status: LetterStatus | 'All') => {
-    return letters.filter(letter => {
-      const matchesStatus = status === 'All' || 
-                           (status === 'Sending' && letter.direction === 'sending' && letter.status === 'Active') ||
-                           (status === 'Receiving' && letter.direction === 'receiving' && letter.status === 'Active') ||
-                           letter.status === status;
-      
-      if (status === 'Delivered') {
-        return letter.is_completed;
-      }
-      return matchesStatus;
-    }).length;
-  };
-
-  const getStatusColor = (status: LetterStatus | 'All') => {
-    switch (status) {
-      case 'All': return 'bg-brand-600 text-white shadow-brand-200';
-      case 'Sending': return 'bg-blue-600 text-white shadow-blue-200';
-      case 'Receiving': return 'bg-indigo-600 text-white shadow-indigo-200';
-      case 'Delivered': return 'bg-green-600 text-white shadow-green-200';
-      case 'Draft': return 'bg-slate-600 text-white shadow-slate-200';
-      case 'Returned': return 'bg-purple-600 text-white shadow-purple-200';
-      case 'Lost': return 'bg-red-600 text-white shadow-red-200';
-      default: return 'bg-brand-600 text-white shadow-brand-200';
-    }
-  };
-
-  const calculateDays = (letter: Letter) => {
-    if (!letter.sent_date) return null;
-    
-    const startDate = new Date(letter.sent_date);
-    const endDate = letter.is_completed && letter.received_date 
-      ? new Date(letter.received_date) 
-      : new Date();
-    
-    return differenceInDays(endDate, startDate);
-  };
-
-  const getDaysColor = (days: number | null) => {
-    if (days === null) return 'text-slate-400';
-    if (days <= 7) return 'text-green-600 font-bold';
-    if (days > 45) return 'text-red-600 font-bold';
-    return 'text-slate-600';
-  };
 
   if (loading) {
     return (
