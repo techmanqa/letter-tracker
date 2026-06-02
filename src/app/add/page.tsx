@@ -23,6 +23,7 @@ export default function AddLetterPage() {
   const [fromAddressLine2, setFromAddressLine2] = useState('');
   const [letterType, setLetterType] = useState<'Sending' | 'Receiving'>('Sending');
   const [sentDate, setSentDate] = useState('');
+  const [receivedDate, setReceivedDate] = useState('');
   const [tracking, setTracking] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -171,7 +172,9 @@ export default function AddLetterPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const currentStatus = 'Active';
+    const currentStatus = (sentDate || receivedDate) 
+      ? (letterType === 'Sending' ? 'Sending' : 'Receiving') 
+      : 'Draft';
 
     // Create the first letter
     const { error: firstError } = await supabase.from('letters').insert({
@@ -191,6 +194,7 @@ export default function AddLetterPage() {
       letter_type: letterType,
       direction: letterType === 'Sending' ? 'sending' : 'receiving',
       sent_date: sentDate || null,
+      received_date: receivedDate || null,
       tracking,
       status: currentStatus,
       attachment_url: attachmentUrl || null,
@@ -538,6 +542,16 @@ export default function AddLetterPage() {
                     className="w-full input-base"
                     value={sentDate}
                     onChange={(e) => setSentDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="receivedDate" className="label-base">Received Date (Optional)</label>
+                  <input
+                    id="receivedDate"
+                    type="date"
+                    className="w-full input-base"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
                   />
                 </div>
                 <div>

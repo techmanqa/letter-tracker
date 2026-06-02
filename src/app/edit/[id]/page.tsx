@@ -15,6 +15,8 @@ export default function EditLetterPage() {
   const [letter, setLetter] = useState<Partial<Letter>>({});
   const [uploading, setUploading] = useState(false);
   const [sources, setSources] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -47,6 +49,37 @@ export default function EditLetterPage() {
       
       if (!sourcesError && sourcesData) {
         setSources(sourcesData);
+      }
+
+      // Fetch addresses for the user
+      const { data: addressesData, error: addressesError } = await supabase
+        .from('addresses')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('is_default', { ascending: false });
+
+      if (!addressesError && addressesData) {
+        setAddresses(addressesData);
+        
+        // Match current letter address to one of the saved addresses
+        if (letter.id || data) {
+          const l = data || letter;
+          const currentCountry = l.letter_type === 'Sending' ? l.from_country : l.to_country;
+          const currentCity = l.letter_type === 'Sending' ? l.from_city : l.to_city;
+          const currentZip = l.letter_type === 'Sending' ? l.from_zip_code : l.to_zip_code;
+          const currentAddr1 = l.letter_type === 'Sending' ? l.from_address_line1 : l.to_address_line1;
+
+          const matchingAddress = addressesData.find(a => 
+            a.country === currentCountry && 
+            a.city === currentCity && 
+            a.zip_code === currentZip &&
+            a.full_address === currentAddr1
+          );
+
+          if (matchingAddress) {
+            setSelectedAddressId(matchingAddress.id.toString());
+          }
+        }
       }
 
       setLoading(false);
@@ -119,6 +152,34 @@ export default function EditLetterPage() {
       alert('Error uploading file: ' + error.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleAddressChange = (addressId: string) => {
+    setSelectedAddressId(addressId);
+    if (addressId) {
+      const address = addresses.find(a => a.id.toString() === addressId);
+      if (address) {
+        if (letter.letter_type === 'Sending') {
+          setLetter({
+            ...letter,
+            from_country: address.country || '',
+            from_city: address.city || '',
+            from_zip_code: address.zip_code || '',
+            from_address_line1: address.full_address || '',
+            from_address_line2: '',
+          });
+        } else {
+          setLetter({
+            ...letter,
+            to_country: address.country || '',
+            to_city: address.city || '',
+            to_zip_code: address.zip_code || '',
+            to_address_line1: address.full_address || '',
+            to_address_line2: '',
+          });
+        }
+      }
     }
   };
 
@@ -237,11 +298,22 @@ export default function EditLetterPage() {
                   {/* My Address */}
                   <div className="space-y-4">
                     <div className="h-6 flex items-center">
-                      <label className="label-base font-semibold mb-0">My Address</label>
+                      <label htmlFor="myAddress" className="label-base font-semibold mb-0">My Address</label>
                     </div>
-                    <div className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600">
-                      {letter.letter_type === 'Sending' ? letter.from_country : letter.to_country} {letter.from_city || letter.to_city ? `- ${letter.letter_type === 'Sending' ? letter.from_city : letter.to_city}` : ''}
-                    </div>
+                    <select
+                      id="myAddress"
+                      className="w-full input-base disabled:opacity-50 disabled:bg-slate-50"
+                      value={selectedAddressId}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      disabled={letter.status !== 'Draft'}
+                    >
+                      <option value="">Select an address</option>
+                      {addresses.map(address => (
+                        <option key={address.id} value={address.id}>
+                          {address.title} ({address.country})
+                        </option>
+                      ))}
+                    </select>
                     <p className="text-xs text-slate-500 italic">This is your saved address used for this letter.</p>
                   </div>
 
@@ -451,7 +523,20 @@ export default function EditLetterPage() {
                     type="date"
                     className="w-full input-base"
                     value={letter.sent_date || ''}
-                    onChange={(e) => setLetter({ ...letter, sent_date: e.target.value })}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const newLetter = { ...letter, sent_date: newDate };
+                      
+                      // If no dates are set, status must be Draft
+                      if (!newDate && !letter.received_date) {
+                        newLetter.status = 'Draft';
+                      } else if (newDate && (!letter.status || letter.status === 'Draft')) {
+                        // If it was draft but now has a date, move to Sending/Active
+                        newLetter.status = letter.letter_type === 'Sending' ? 'Sending' : 'Receiving';
+                      }
+                      
+                      setLetter(newLetter);
+                    }}
                   />
                 </div>
                 <div>
@@ -461,7 +546,20 @@ export default function EditLetterPage() {
                     type="date"
                     className="w-full input-base"
                     value={letter.received_date || ''}
-                    onChange={(e) => setLetter({ ...letter, received_date: e.target.value })}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const newLetter = { ...letter, received_date: newDate };
+                      
+                      // If no dates are set, status must be Draft
+                      if (!newDate && !letter.sent_date) {
+                        newLetter.status = 'Draft';
+                      } else if (newDate && (!letter.status || letter.status === 'Draft')) {
+                        // If it was draft but now has a date, move to Sending/Active
+                        newLetter.status = letter.letter_type === 'Receiving' ? 'Receiving' : 'Sending';
+                      }
+                      
+                      setLetter(newLetter);
+                    }}
                   />
                 </div>
                 <div>
@@ -477,6 +575,12 @@ export default function EditLetterPage() {
                       // Check if we can actually mark as Delivered
                       if (isDelivered && (!letter.sent_date || !letter.received_date)) {
                         alert('Both Sent and Received dates are required to mark as Delivered/Completed.');
+                        return;
+                      }
+                      
+                      // If user tries to change from Draft but has no dates
+                      if (newStatus !== 'Draft' && !letter.sent_date && !letter.received_date) {
+                        alert('Please set a Sent or Received date before changing status from Draft.');
                         return;
                       }
 
