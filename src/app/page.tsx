@@ -152,7 +152,7 @@ export default function HomePage() {
               Community Impact
             </h3>
             <p className="text-brand-100 text-md leading-relaxed mb-6">
-              Every letter tracked is a story shared. From Qatar to the rest of the world, 
+              Every letter tracked is a story shared. From your city to the rest of the world,
               we're helping people stay connected, one stamp at a time.
             </p>
             <div className="flex gap-8">
